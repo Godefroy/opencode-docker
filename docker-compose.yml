@@ -1,0 +1,52 @@
+# opencode-docker — one box per user.
+#
+# Local:   cp .env.example .env  &&  make up
+# Deploy:  same file works on Dokploy / any Docker host (see README).
+services:
+  opencode-box:
+    build: .
+    image: opencode-docker:latest
+    container_name: opencode-box
+    restart: unless-stopped
+
+    # Docker-in-Docker requires privileged mode.
+    privileged: true
+
+    env_file:
+      - .env
+
+    environment:
+      # gh CLI reads GH_TOKEN — mirror the PAT so `gh` works in every shell/exec.
+      GH_TOKEN: ${GITHUB_PAT:-}
+
+    ports:
+      # opencode web (protected by OPENCODE_SERVER_PASSWORD)
+      - "${OPENCODE_PORT:-4096}:${OPENCODE_PORT:-4096}"
+      # --- Dev ports for your in-box projects -------------------------------
+      # Add the ports your projects expose (single ports or ranges). Bind your
+      # in-box docker compose services to these same ports. Edit freely:
+      - "3000-3010:3000-3010"
+      - "8080:8080"
+      - "5173:5173"
+      - "1080:1080"   # MailDev interface web (lecture des mails)
+
+    volumes:
+      # Code (/root/workspace) + agent config/auth + git creds + history.
+      - home:/root
+      # DinD storage: nested images/build cache (rebuildable) AND your projects'
+      # named volumes (databases, etc. — real data). Persists across restarts;
+      # only `make nuke` wipes it. See "Persisting project data" in the README
+      # for clean backup strategies.
+      - docker-data:/var/lib/docker
+
+    healthcheck:
+      # opencode web is up if it answers with any HTTP status (401 included).
+      test: ["CMD", "sh", "-c", "[ \"$(curl -s -o /dev/null -w '%{http_code}' http://localhost:${OPENCODE_PORT:-4096})\" != \"000\" ]"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  home:
+  docker-data:

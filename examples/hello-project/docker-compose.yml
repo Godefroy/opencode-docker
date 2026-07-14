@@ -1,0 +1,19 @@
+# Example project you would run INSIDE the box (projects live in ~/workspace).
+#
+#   make shell                       # get into the box
+#   cd ~/workspace/hello-project
+#   docker compose up -d             # uses the box's in-container Docker (DinD)
+#
+# Because port 8080 is published in the top-level docker-compose.yml, it is
+# chained out to the host:  host:8080 -> box:8080 -> this container:80
+#
+# Front+back reminder: browser basic-auth is per-origin, so we do NOT put auth
+# on dev ports by default (a front on :3000 calling a back on :3001 would 401).
+# See the README "Securing dev ports" section for the safe options.
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
