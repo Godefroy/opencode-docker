@@ -14,6 +14,7 @@ RUN set -eux; \
         git openssh-client \
         python3 python3-pip python3-venv \
         iptables uidmap \
+        unzip \
         tini procps sudo jq vim; \
     # Docker needs iptables-legacy inside a container on bookworm
     update-alternatives --set iptables /usr/sbin/iptables-legacy || true; \
@@ -48,6 +49,19 @@ RUN set -eux; \
 
 # ---- Python fast tooling: uv -----------------------------------------------
 RUN pip install --no-cache-dir --break-system-packages uv
+
+# ---- Deno (native, on PATH) ------------------------------------------------
+#  Netlify Edge Functions (@astrojs/netlify -> @netlify/edge-bundler) need Deno.
+#  On Linux the bundler ALWAYS downloads an x86_64 Deno (no arm64 branch), which
+#  can't run in an arm64 container — OrbStack fails with
+#  "Dynamic loader not found: /lib64/ld-linux-x86-64.so.2".
+#  Installing a native Deno on PATH makes the bundler reuse it (its `useGlobal`
+#  check runs `deno --version` first) and skip the broken download entirely.
+#  Installed under /usr/local (NOT ~/.deno) so the /root home volume can't
+#  shadow it at runtime, like Playwright/pm2 above.
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh -s -- --no-modify-path \
+    && deno --version
 
 # ---- AI coding agents ------------------------------------------------------
 #  opencode-ai            -> `opencode` (TUI + `opencode web`)
