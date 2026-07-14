@@ -234,10 +234,31 @@ it come back after a box restart:
 cd ~/workspace/my-project
 pm2 start "pnpm dev" --name my-project-web
 pm2 start "pnpm worker" --name my-project-worker
-pm2 save                 # <-- required: without it, nothing is resurrected
+pm2 save                 # <-- required: without it, nothing is resurrected at restart
 pm2 ls                   # your project processes
 pm2 logs my-project-web  # follow output
 ```
+
+> ⚠️ **Bind dev servers to `0.0.0.0`, not `localhost`.** Most dev servers default to
+> `127.0.0.1`, which is only reachable from *inside* the box — the host port forward gets
+> nothing. Pass the framework's host flag so it listens on all interfaces. Examples:
+> ```bash
+> pm2 start "npx astro dev --host 0.0.0.0 --port 4321" --name my-project-web
+> pm2 start "npx vite --host 0.0.0.0" --name my-project-web        # Vite
+> pm2 start "next dev -H 0.0.0.0 -p 3000" --name my-project-web    # Next.js
+> ```
+> (The same applies when running a server directly, not just under pm2.)
+>
+> **Vite shortcut:** the box exports `VITE_HOST=0.0.0.0` (see `docker-compose.yml`),
+> so a project whose `vite.config` reads it binds all interfaces automatically —
+> no per-command flag needed. Have the config default to `localhost` so it still
+> serves locally when run outside the box:
+> ```ts
+> server: {
+>   host: process.env.VITE_HOST || undefined,   // localhost by default, 0.0.0.0 in the box
+>   port: Number(process.env.VITE_PORT) || 5173,
+> }
+> ```
 
 After the next `make up`, your saved processes start again automatically. Skip this with
 `PM2_RESURRECT=false` in `.env`.
