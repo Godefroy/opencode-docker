@@ -151,15 +151,37 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Launch opencode web
+# 4. Web credentials — one source of truth for BOTH web UIs
+#    WEB_USERNAME / WEB_PASSWORD protect opencode web AND code-server with the
+#    same login/password. We fan them out to each server's own env var here.
+#      - opencode web : HTTP basic auth (OPENCODE_SERVER_USERNAME/PASSWORD)
+#      - code-server  : password login form (PASSWORD; username not used)
+#    The password is only ever passed via env — never written to disk in the
+#    persisted home volume.
 # ---------------------------------------------------------------------------
 : "${OPENCODE_PORT:=4096}"
-export OPENCODE_PORT
+: "${CODE_SERVER_PORT:=4097}"
+: "${WEB_USERNAME:=opencode}"
+export OPENCODE_PORT CODE_SERVER_PORT
 
-if [ -z "${OPENCODE_SERVER_PASSWORD:-}" ]; then
-  log "WARNING: OPENCODE_SERVER_PASSWORD is not set — opencode web will be UNAUTHENTICATED."
+export OPENCODE_SERVER_USERNAME="${WEB_USERNAME}"
+export OPENCODE_SERVER_PASSWORD="${WEB_PASSWORD:-}"
+export PASSWORD="${WEB_PASSWORD:-}"   # code-server
+
+if [ -z "${WEB_PASSWORD:-}" ]; then
+  # code-server refuses to serve with `--auth password` and an empty password,
+  # so drop it to no-auth too — matching opencode's unauthenticated behaviour.
+  export CODE_SERVER_AUTH=none
+  log "WARNING: WEB_PASSWORD is not set — opencode web AND code-server will be UNAUTHENTICATED."
   log "         Fine for local use; set it before exposing this box to a network."
+else
+  export CODE_SERVER_AUTH=password
 fi
+
+# opencode/code-server both open this dir as the workspace — a dedicated dir,
+# NOT $HOME (opening $HOME breaks opencode's project picker / recent-projects).
+mkdir -p /root/workspace
+cd /root/workspace
 
 # Allow overriding the launched command (e.g. keep the box up for `exec`)
 if [ "$#" -gt 0 ]; then
@@ -167,9 +189,5 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
-log "starting opencode web on 0.0.0.0:${OPENCODE_PORT} (mode: ${mode})"
-# opencode opens its cwd as the workspace — use a dedicated dir, NOT $HOME
-# (opening $HOME breaks opencode's project picker / recent-projects display).
-mkdir -p /root/workspace
-cd /root/workspace
-exec opencode web --hostname 0.0.0.0 --port "${OPENCODE_PORT}"
+log "starting opencode web on :${OPENCODE_PORT} + code-server on :${CODE_SERVER_PORT} (mode: ${mode}, auth: ${CODE_SERVER_AUTH})"
+exec pm2-runtime start /opt/opencode-docker/ecosystem.config.js

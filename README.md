@@ -8,6 +8,7 @@ Each box ships:
 
 - **git** + **GitHub CLI** (`gh`), authenticated from a PAT
 - **[opencode](https://opencode.ai)** — exposed as a web UI (`opencode web`)
+- **[code-server](https://github.com/coder/code-server)** — full **VS Code in the browser**, behind the same password as opencode web
 - **[Claude Code](https://github.com/anthropics/claude-code)** (`claude`)
 - **[opencode-with-claude](https://github.com/ianjwhite99/opencode-with-claude)** — plugin to drive opencode with your **Claude Max** subscription
 - **Node.js 22** (+ `pnpm`, `yarn`, `pm2`) **+ Python 3 + uv**, `vim`
@@ -26,6 +27,7 @@ Test it locally, deploy it on **Dokploy** or any Docker host.
   │  opencode-box (privileged)                                     │
   │                                                                │
   │   opencode web  ──:4096──────────────────────────────────►  published (auth: password)
+  │   code-server   ──:4097──────────────────────────────────►  published (auth: same password)
   │   claude / opencode CLI                                        │
   │                                                                │
   │   dockerd (DinD)  ── your projects ──┐                         │
@@ -49,11 +51,13 @@ Requires Docker (Docker Desktop is fine — privileged/DinD works inside its VM)
 ```bash
 git clone <this-repo> opencode-docker && cd opencode-docker
 cp .env.example .env
-# edit .env: set OPENCODE_SERVER_PASSWORD, pick a Claude mode, add GITHUB_PAT...
+# edit .env: set WEB_PASSWORD, pick a Claude mode, add GITHUB_PAT...
 make up
 ```
 
-Open **http://localhost:4096** (user `opencode`, the password from `.env`).
+Two web UIs, both behind the same `WEB_PASSWORD`:
+- **opencode web** — http://localhost:4096 (user = `WEB_USERNAME`, password from `.env`)
+- **code-server** (VS Code in the browser) — http://localhost:4097 (password from `.env`)
 
 Common commands:
 
@@ -72,9 +76,10 @@ make nuke          # stop + delete all volumes (destructive)
 
 | Variable | Default | Purpose |
 |---|---|---|
+| `WEB_PASSWORD` | — | **One** password for BOTH opencode web and code-server. **Empty = no auth** (local only). |
+| `WEB_USERNAME` | `opencode` | Login for opencode web's basic auth (code-server's form is password-only). |
 | `OPENCODE_PORT` | `4096` | Port for opencode web |
-| `OPENCODE_SERVER_PASSWORD` | — | Basic-auth password for opencode web. **Empty = no auth** (local only). |
-| `OPENCODE_SERVER_USERNAME` | `opencode` | Basic-auth username |
+| `CODE_SERVER_PORT` | `4097` | Port for code-server (VS Code in the browser) |
 | `CLAUDE_AUTH_MODE` | `max` | `max` (opencode-with-claude plugin) or `manual` (configure in the UI). See below. |
 | `GITHUB_PAT` | — | GitHub token for `git` over HTTPS and `gh` |
 | `GIT_USER_NAME` / `GIT_USER_EMAIL` | auto | git identity — auto-derived from the PAT (GitHub `/user` API) if left empty; set to override |
@@ -245,8 +250,8 @@ and is fragile to restore across Docker versions). Instead, one of:
 2. Enable **Swarm/Compose privileged** (required for DinD) — the compose already sets
    `privileged: true`.
 3. Set the env vars from `.env.example` in the Dokploy UI.
-4. Map a **domain** to service port `4096` (Traefik gives you TLS). This is your
-   opencode web entry point; keep `OPENCODE_SERVER_PASSWORD` set.
+4. Map **domains** to service ports `4096` (opencode web) and `4097` (code-server) —
+   Traefik gives you TLS. Keep `WEB_PASSWORD` set; it guards both.
 5. For project dev ports, either map extra domains/ports in Dokploy, or reach them over
    a network gate (see above). Keep **both** volumes persistent: `home` (code + config)
    and `docker-data` (nested images + your projects' volumes/databases). See
@@ -275,7 +280,8 @@ the dev ports at the firewall or behind a VPN.
 | Nested containers | **Docker-in-Docker** (privileged), isolated per user |
 | Storage | `docker-data` volume on `/var/lib/docker` — nested images + **your project volumes** (ext4-backed, avoids overlay-on-overlay) |
 | Persistence | single `home` volume on `/root` — projects in `/root/workspace` (what opencode opens) + agent auth + git creds + history. Back up this one. |
-| opencode web auth | native `OPENCODE_SERVER_PASSWORD` |
+| Web editor | **code-server** (VS Code in the browser) on `:4097` |
+| Web auth | one `WEB_PASSWORD` for both opencode web (basic auth) and code-server (login form) |
 | Dev-port auth | none by default (per-origin basic-auth caveat) — gate at network/platform |
 | Zombie reaping | `tini` as PID 1 |
 
@@ -290,7 +296,7 @@ the dev ports at the firewall or behind a VPN.
   (overlay-on-overlay). Mount the `docker-data` **named volume** there (the provided
   `docker-compose.yml` already does). With plain `docker run`, add
   `-v some-vol:/var/lib/docker`.
-- **opencode web unauthenticated warning** → set `OPENCODE_SERVER_PASSWORD`.
+- **web unauthenticated warning** → set `WEB_PASSWORD` (guards both opencode web and code-server).
 - **`max` mode not using Claude** → run `make claude-login` once; check the Meridian
   proxy started (opencode logs) and that `/root` is a persistent volume.
 - **A project port isn't reachable** → it must be published in `docker-compose.yml`; add it

@@ -81,6 +81,14 @@ RUN npm install -g playwright \
     && npm cache clean --force \
     && rm -rf /var/lib/apt/lists/*
 
+# ---- code-server (VS Code in the browser) ----------------------------------
+#  Full VS Code editor over HTTP, password-protected — shares the same
+#  WEB_PASSWORD as opencode web. Its config/data live under /root/.local &
+#  /root/.config, so they persist in the home volume like everything else.
+RUN set -eux; \
+    curl -fsSL https://code-server.dev/install.sh | sh; \
+    rm -rf /var/lib/apt/lists/*
+
 # ---------------------------------------------------------------------------
 # Runtime layout
 # ---------------------------------------------------------------------------
@@ -102,9 +110,13 @@ RUN printf '#!/bin/sh\necho "[xdg-open] (headless, ignored) $*" >&2\nexit 0\n' \
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# opencode web (default) + a sample dev-port range. Actual published ports are
-# controlled at run time via docker-compose (see docker-compose.yml / DEV_PORTS).
+# pm2-runtime process file (lives outside /root so the home volume can't shadow it)
+COPY scripts/ecosystem.config.js /opt/opencode-docker/ecosystem.config.js
+
+# opencode web + code-server + a sample dev-port range. Actual published ports
+# are controlled at run time via docker-compose (see docker-compose.yml).
 EXPOSE 4096
+EXPOSE 4097
 EXPOSE 3000-3010
 
 # tini reaps zombies (dockerd + child dev containers spawn many short-lived procs)

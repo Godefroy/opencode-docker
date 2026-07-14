@@ -16,6 +16,7 @@ build: ## Build the image
 up: env ## Start the box (builds if needed)
 	docker compose up -d --build
 	@echo "opencode web:  http://localhost:$$(grep -E '^OPENCODE_PORT=' .env | cut -d= -f2 || echo 4096)"
+	@echo "code-server:   http://localhost:$$(grep -E '^CODE_SERVER_PORT=' .env | cut -d= -f2 || echo 4097)"
 
 down: ## Stop and remove the box (keeps volumes)
 	docker compose down

@@ -20,8 +20,9 @@ services:
       GH_TOKEN: ${GITHUB_PAT:-}
 
     ports:
-      # opencode web (protected by OPENCODE_SERVER_PASSWORD)
+      # opencode web + code-server — both protected by WEB_PASSWORD
       - "${OPENCODE_PORT:-4096}:${OPENCODE_PORT:-4096}"
+      - "${CODE_SERVER_PORT:-4097}:${CODE_SERVER_PORT:-4097}"
       # --- Dev ports for your in-box projects -------------------------------
       # Add the ports your projects expose (single ports or ranges). Bind your
       # in-box docker compose services to these same ports. Edit freely:
