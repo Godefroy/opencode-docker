@@ -16,6 +16,12 @@ if [ "${ENABLE_DIND:-true}" = "true" ]; then
     log "docker socket already available (host socket mounted?) — not starting dockerd"
   else
     log "starting dockerd..."
+    # A prior run can leave a stale /var/run/docker.pid (e.g. after
+    # `docker compose restart`, which reuses the same container filesystem).
+    # The new daemon then refuses to start — "process with PID N is still
+    # running" — because a different process now holds that recycled PID. Clear
+    # it first. Harmless on a fresh container (file absent).
+    rm -f /var/run/docker.pid
     # Needs --privileged. Storage lives on the /var/lib/docker volume (ext4),
     # avoiding overlay-on-overlay issues.
     dockerd \
@@ -189,5 +195,28 @@ if [ "$#" -gt 0 ]; then
   exec "$@"
 fi
 
+# ---------------------------------------------------------------------------
+# 5. Two disjoint pm2 namespaces so box services and your project processes
+#    never step on each other — no dedup, no app names hardcoded here.
+#
+#    - Your projects use the DEFAULT pm2 home (~/.pm2). In a project shell:
+#        pm2 start "pnpm dev" --name foo   &&   pm2 save
+#      `pm2 save` snapshots them to ~/.pm2/dump.pm2 (persisted in the home
+#      volume); we `pm2 resurrect` that dump here so they survive box restarts.
+#      Opt out with PM2_RESURRECT=false.
+#
+#    - The box's own services (opencode, code-server, …) run under a SEPARATE
+#      pm2 home (PM2_HOME below), straight from the ecosystem file — the single
+#      source of truth. Because it's a different home, a user `pm2 save` can
+#      never capture them, so box services stay authoritative and you can add
+#      or remove them by editing only ecosystem.config.js.
+#      Inspect them with:  PM2_HOME=/root/.pm2-box pm2 ls
+# ---------------------------------------------------------------------------
+if [ "${PM2_RESURRECT:-true}" = "true" ] && [ -f "${HOME}/.pm2/dump.pm2" ]; then
+  log "resurrecting saved pm2 project processes from ~/.pm2/dump.pm2"
+  pm2 resurrect || log "pm2 resurrect failed — continuing without saved processes"
+fi
+
 log "starting opencode web on :${OPENCODE_PORT} + code-server on :${CODE_SERVER_PORT} (mode: ${mode}, auth: ${CODE_SERVER_AUTH})"
+export PM2_HOME=/root/.pm2-box
 exec pm2-runtime start /opt/opencode-docker/ecosystem.config.js

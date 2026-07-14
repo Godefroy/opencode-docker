@@ -211,6 +211,39 @@ default path.
 
 ---
 
+## Keeping dev servers running (pm2)
+
+You have two ways to keep a project's long-running command alive. Pick by what the
+command *is*:
+
+**Already containerised (has its own `docker-compose.yml`) → run it in DinD.**
+This is the pattern in [`examples/hello-project`](examples/hello-project). Use
+`restart: unless-stopped`; the container's state lives in the `docker-data` volume, so it
+comes back on its own after a box restart. Nothing else to do.
+
+```bash
+cd ~/workspace/my-project
+docker compose up -d
+```
+
+**A raw process (`pnpm dev`, a worker, a watch script) → use pm2.**
+pm2 is pre-installed. Start your process, then **`pm2 save`** — that snapshot is what makes
+it come back after a box restart:
+
+```bash
+cd ~/workspace/my-project
+pm2 start "pnpm dev" --name my-project-web
+pm2 start "pnpm worker" --name my-project-worker
+pm2 save                 # <-- required: without it, nothing is resurrected
+pm2 ls                   # your project processes
+pm2 logs my-project-web  # follow output
+```
+
+After the next `make up`, your saved processes start again automatically. Skip this with
+`PM2_RESURRECT=false` in `.env`.
+
+---
+
 ## Persisting project data
 
 When you run a project's `docker compose` **inside** the box, any named volumes it
