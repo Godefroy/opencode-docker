@@ -28,8 +28,6 @@ services:
       # in-box docker compose services to these same ports. Edit freely:
       - "3000-3010:3000-3010"
       - "8080:8080"
-      - "5173:5173"
-      - "1080:1080"   # MailDev interface web (lecture des mails)
 
     volumes:
       # Code (/root/workspace) + agent config/auth + git creds + history.
