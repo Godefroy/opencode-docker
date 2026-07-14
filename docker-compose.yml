@@ -18,6 +18,11 @@ services:
     environment:
       # gh CLI reads GH_TOKEN — mirror the PAT so `gh` works in every shell/exec.
       GH_TOKEN: ${GITHUB_PAT:-}
+      # Vite dev servers must bind 0.0.0.0 (not localhost) to be reachable
+      # through the published ports. A project's vite.config that honors
+      # VITE_HOST serves on all interfaces inside the box while still
+      # defaulting to localhost when run outside it.
+      VITE_HOST: "0.0.0.0"
 
     ports:
       # opencode web + code-server — both protected by WEB_PASSWORD
