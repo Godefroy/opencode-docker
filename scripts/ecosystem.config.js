@@ -24,30 +24,50 @@ const codeAuth = process.env.CODE_SERVER_AUTH || "password";
 // default home, which is where entrypoint.sh resurrects from.
 const resetPm2Home = "export PM2_HOME=/root/.pm2;";
 
-module.exports = {
-  apps: [
-    {
-      name: "opencode",
-      // interpreter "none" -> pm2 execs the binary directly instead of via node
-      script: "/bin/bash",
-      interpreter: "none",
-      args: ["-c", `${resetPm2Home} exec opencode web --hostname 0.0.0.0 --port ${opencodePort}`],
-      cwd: "/root/workspace",
-      autorestart: true,
-      max_restarts: 20,
-    },
-    {
-      name: "code-server",
-      script: "/bin/bash",
-      interpreter: "none",
-      args: [
-        "-c",
-        `${resetPm2Home} exec code-server --bind-addr 0.0.0.0:${codePort} --auth ${codeAuth} ` +
-          `--disable-telemetry --disable-update-check /root/workspace`,
-      ],
-      cwd: "/root/workspace",
-      autorestart: true,
-      max_restarts: 20,
-    },
-  ],
-};
+// Optional background service: periodically `git pull` the repos in the home
+// dir + workspace. Enabled by a single env var — empty/0/off (default) means
+// the app is never added to pm2, so it costs nothing when disabled.
+const autopullInterval = (process.env.GIT_AUTOPULL_INTERVAL || "").trim();
+const autopullEnabled =
+  autopullInterval !== "" &&
+  !["0", "off", "false", "no"].includes(autopullInterval.toLowerCase());
+
+const apps = [
+  {
+    name: "opencode",
+    // interpreter "none" -> pm2 execs the binary directly instead of via node
+    script: "/bin/bash",
+    interpreter: "none",
+    args: ["-c", `${resetPm2Home} exec opencode web --hostname 0.0.0.0 --port ${opencodePort}`],
+    cwd: "/root/workspace",
+    autorestart: true,
+    max_restarts: 20,
+  },
+  {
+    name: "code-server",
+    script: "/bin/bash",
+    interpreter: "none",
+    args: [
+      "-c",
+      `${resetPm2Home} exec code-server --bind-addr 0.0.0.0:${codePort} --auth ${codeAuth} ` +
+        `--disable-telemetry --disable-update-check /root/workspace`,
+    ],
+    cwd: "/root/workspace",
+    autorestart: true,
+    max_restarts: 20,
+  },
+];
+
+if (autopullEnabled) {
+  apps.push({
+    name: "git-autopull",
+    script: "/bin/bash",
+    interpreter: "none",
+    args: ["-c", `${resetPm2Home} exec /opt/opencode-docker/git-autopull.sh`],
+    cwd: "/root/workspace",
+    autorestart: true,
+    max_restarts: 20,
+  });
+}
+
+module.exports = { apps };

@@ -84,6 +84,7 @@ make nuke          # stop + delete all volumes (destructive)
 | `GITHUB_PAT` | — | GitHub token for `git` over HTTPS and `gh` |
 | `GIT_USER_NAME` / `GIT_USER_EMAIL` | auto | git identity — auto-derived from the PAT (GitHub `/user` API) if left empty; set to override |
 | `ENABLE_DIND` | `true` | Start the in-box Docker daemon. `false` = expect a mounted host socket. |
+| `GIT_AUTOPULL_INTERVAL` | — (off) | Periodically `git pull --ff-only` every repo in `/root` + `/root/workspace`. Interval as `1h` / `30m` / `3600`. Empty = disabled. |
 | `OPENCODE_FORCE_CONFIG` | `false` | Regenerate `opencode.json` from env on every boot |
 
 ### Claude: two modes

@@ -127,6 +127,10 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # pm2-runtime process file (lives outside /root so the home volume can't shadow it)
 COPY scripts/ecosystem.config.js /opt/opencode-docker/ecosystem.config.js
 
+# Optional git auto-pull service (enabled via GIT_AUTOPULL_INTERVAL)
+COPY scripts/git-autopull.sh /opt/opencode-docker/git-autopull.sh
+RUN chmod +x /opt/opencode-docker/git-autopull.sh
+
 # opencode web + code-server + a sample dev-port range. Actual published ports
 # are controlled at run time via docker-compose (see docker-compose.yml).
 EXPOSE 4096
